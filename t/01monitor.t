@@ -8,6 +8,9 @@ BEGIN {
 	print STDERR "*** Note: this test executes for approx. 35 secs\n";
 	print "1..$tests\n";
 }
+
+use Config;
+
 #
 # forks a child to run system('perl -d:STrace somescript.pl'),
 #	which this process monitors
@@ -38,16 +41,23 @@ sub report_result {
 
 my $testno = 1;
 
+my $cmd = ($Config{useithreads} && (!$ENV{DEVEL_RINGBUF_NOTHREADS})) ?
+	(($^O eq 'MSWin32') ?
+		"perl -w -d:STrace t\\tracetest.pl -t $ringcnt" :
+		"perl -w -d:STrace t/tracetest.pl -t $ringcnt") :
+
+	(($^O eq 'MSWin32') ?
+		"perl -w -d:STrace t\\tracetestnt.pl -p $ringcnt" :
+		"perl -w -d:STrace t/tracetestnt.pl -p $ringcnt");
+
+#print STDERR "\n*** Running $cmd\n";
+
 my $child1 = fork();
 
 die "Can't fork tracing child: $!" unless defined $child1;
 
-my $cmd = ($^O eq 'MSWin32') ?
-	'perl -w -d:STrace t\\tracetest.pl' :
-	'perl -w -d:STrace t/tracetest.pl';
-
 unless ($child1) {
-	system("$cmd -t $ringcnt");
+	system($cmd);
 	exit 1;
 }
 #
@@ -74,7 +84,9 @@ sub monitor {
 
 #	print STDERR "Started $file\n";
 	my ($started, $lastrefresh) = (time(), time());
-	my $rings = $ringcnt + 1;
+	my $rings = $ringcnt;
+	$rings++
+		if ($Config{useithreads} && (!$ENV{DEVEL_RINGBUF_NOTHREADS}));
 	my $ok = 1;
 	my %keys = ();
 	while ((time() - $started) < $duration) {
@@ -92,18 +104,18 @@ sub monitor {
 				my ($key, $slot, $depth, $line, $time, $entry) = @_;
 				$keys{$key} = 1,
 				$lastkey = $key
-#				print "\n**************************************\n"
+#				print STDERR "\n**************************************\n"
 					unless ($lastkey eq $key);
 				if ($time) {
 					my $frac = ($time - int($time)) * 1000000;
 					$frac=~s/\..*$//;
 					my @parts = split(/\s+/, scalar localtime($time));
 					pop @parts;	# get rid of year
-#					print "$key($depth) : $slot : $entry:$line at ",
+#					print STDERR "$key($depth) : $slot : $entry:$line at ",
 #						join(' ', @parts), '.', $frac, "\n";
 				}
 				else {
-#					print "$key($depth) : $slot : $entry:$line (No timestamp)\n";
+#					print STDERR "$key($depth) : $slot : $entry:$line (No timestamp)\n";
 				}
 			}
 		);
@@ -111,7 +123,7 @@ sub monitor {
 #	verify we got hte number of distinct keys we expected
 #
 		unless ($rings == scalar keys %keys) {
-			print "rings is $rings and keys is ", scalar keys %keys, "\n";
+#			print STDERR "rings is $rings and keys is ", scalar keys %keys, "\n";
 #			$ok = undef, last
 			$ok = undef;
 		}

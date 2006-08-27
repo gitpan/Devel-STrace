@@ -1,5 +1,9 @@
 Version 0.30 2006-04-28	D. Arnold
 
+	- remove threads dependency
+
+Version 0.30 2006-04-28	D. Arnold
+
 	- extracted RingBuffer, Ring modules into separate module
 
 Version 0.20 2006-04-16	D. Arnold

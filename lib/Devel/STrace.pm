@@ -27,15 +27,23 @@ require 5.008;
 
 package DB;
 
-use threads;
+#use threads;
+use Config;
 use Time::HiRes qw(time);
 use Devel::RingBuffer;
 use Devel::RingBuffer qw(:ringbuffer_consts);
 
-$Devel::STrace::VERSION = '0.30';
+$Devel::STrace::VERSION = '0.31';
 
 # disable DB single-stepping
 BEGIN {
+	if ($Config{useithreads} && (!$ENV{DEVEL_RINGBUF_NOTHREADS})) {
+		require Devel::RingBuffer::ThreadFacade;
+		$hasThreads = 1;
+	}
+	else {
+		$hasThreads = undef;
+	}
 	$single = 0;
 	$subtrace = 1;
 	$tid = -1;
@@ -62,10 +70,10 @@ BEGIN {
 # @static
 #*/
 sub CLONE {
-#	print STDERR " ++++ In CLONE for ", threads->self()->tid(), "\n";
+#	print STDERR " ++++ In CLONE for ", Devel::RingBuffer::ThreadFacade->tid(), "\n";
 	my ($oldtrace, $oldsingle) = ($subtrace, $single);
 	$pid = $$;
-	$tid = threads->self()->tid();
+	$tid = $hasThreads ? Devel::RingBuffer::ThreadFacade::tid() : 0;
 	$subtrace = 0;
 	$single = 0;
 	if (defined($myring)) {
@@ -78,7 +86,7 @@ sub CLONE {
 	}
 	($single, $subtrace) = (1, $oldtrace);
 #	print STDERR " ++++ Exit CLONE for ",
-		threads->self()->tid(), " with $ringaddr\n";
+#		Devel::RingBuffer::ThreadFacade->tid(), " with $ringaddr\n";
 }
 #/**
 # Debug a single statement. Creates a ringbuffer if none exists.
@@ -112,7 +120,7 @@ sub DB {
 #	alloc the root's ringbuffer so we can tie to it
 #
 		$pid = $$;
-		$tid = threads->self()->tid();
+		$tid = ($hasThreads ? Devel::RingBuffer::ThreadFacade->tid() : 0);
 		$myring = $ringbuffer->allocate();
 		die "Can't get a ring!!!!\n"
 			unless $myring;
@@ -134,7 +142,7 @@ sub DB {
 #	of the fork level
 #
 		$pid = $$;
-		$tid = threads->self()->tid();
+		$tid = ($hasThreads ? Devel::RingBuffer::ThreadFacade->tid() : 0);
 		$myring = $myring->clone();
 		$depth = 0;
 #

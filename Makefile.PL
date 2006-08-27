@@ -34,7 +34,7 @@ foreach my $src ('plstrace') {
 
 my %prereqs = (
 	'IPC::Mmap' => '0.11',
-	'Devel::RingBuffer' => '0.30'
+	'Devel::RingBuffer' => '0.31'
 );
 
 my %opts = (
